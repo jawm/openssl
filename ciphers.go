@@ -40,14 +40,13 @@ func NewUnauthenticatedGCM(isEncrypter bool, key []byte, iv []byte) (cipher.Bloc
 	ivptr := (*C.uchar)(&iv[0])
 
 	ccipher := C.EVP_aes_256_gcm()
-	cipher := &Cipher{ptr: ccipher}
 
 	if isEncrypter {
-		if 1 != C.EVP_EncryptInit_ex(ctx.ctx, cipher.ptr, nil, keyptr, ivptr) {
+		if 1 != C.EVP_EncryptInit_ex(ctx.ctx, ccipher, nil, keyptr, ivptr) {
 			return nil, errors.New("Error encrypt init")
 		}
 	} else {
-		if 1 != C.EVP_DecryptInit_ex(ctx.ctx, cipher.ptr, nil, keyptr, ivptr) {
+		if 1 != C.EVP_DecryptInit_ex(ctx.ctx, ccipher, nil, keyptr, ivptr) {
 			return nil, errors.New("Error decrypt init")
 		}
 	}
