@@ -4,7 +4,7 @@ The Go stdlib implementation of GCM is quite restrictive in that it makes it dif
 Sometimes you don't have a choice though. This library allows you to do streaming GCM encryption without authenticating data.
 You should not do this unless you absolutely must.
 
-This was forked from here: github.com/spacemonkeygo/openssl
+This was forked from here: https://github.com/spacemonkeygo/openssl
 The original code was more general purpose, but I've gutted most things I don't need. 
 
 ## Building
