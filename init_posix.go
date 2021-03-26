@@ -14,6 +14,7 @@
 
 // +build linux darwin solaris
 // +build !windows
+// +build gcm
 
 package openssl
 

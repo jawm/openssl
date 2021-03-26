@@ -1,3 +1,5 @@
+// +build gcm
+
 // Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,6 +84,9 @@ Help wanted: To get this library to work with net/http's client, we
 had to fork net/http. It would be nice if an alternate http client library
 supported the generality needed to use OpenSSL instead of crypto/tls.
 */
+
+// +build gcm
+
 package openssl
 
 // #include "shim.h"

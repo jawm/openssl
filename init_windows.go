@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // +build windows
+// +build gcm
 
 package openssl
 

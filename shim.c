@@ -34,9 +34,6 @@
 extern int go_init_locks();
 extern void go_thread_locking_callback(int, int, const char*, int);
 extern unsigned long go_thread_id_callback();
-static int go_write_bio_puts(BIO *b, const char *str) {
-	return go_write_bio_write(b, (char*)str, (int)strlen(str));
-}
 
 /*
  ************************************************
@@ -137,48 +134,6 @@ static BIO_METHOD *readBioMethod;
 
 BIO_METHOD* BIO_s_readBio() { return readBioMethod; }
 BIO_METHOD* BIO_s_writeBio() { return writeBioMethod; }
-
-int x_bio_init_methods() {
-	writeBioMethod = BIO_meth_new(BIO_TYPE_SOURCE_SINK, "Go Write BIO");
-	if (!writeBioMethod) {
-		return 1;
-	}
-	if (1 != BIO_meth_set_write(writeBioMethod,
-				(int (*)(BIO *, const char *, int))go_write_bio_write)) {
-		return 2;
-	}
-	if (1 != BIO_meth_set_puts(writeBioMethod, go_write_bio_puts)) {
-		return 3;
-	}
-	if (1 != BIO_meth_set_ctrl(writeBioMethod, go_write_bio_ctrl)) {
-		return 4;
-	}
-	if (1 != BIO_meth_set_create(writeBioMethod, x_bio_create)) {
-		return 5;
-	}
-	if (1 != BIO_meth_set_destroy(writeBioMethod, x_bio_free)) {
-		return 6;
-	}
-
-	readBioMethod = BIO_meth_new(BIO_TYPE_SOURCE_SINK, "Go Read BIO");
-	if (!readBioMethod) {
-		return 7;
-	}
-	if (1 != BIO_meth_set_read(readBioMethod, go_read_bio_read)) {
-		return 8;
-	}
-	if (1 != BIO_meth_set_ctrl(readBioMethod, go_read_bio_ctrl)) {
-		return 9;
-	}
-	if (1 != BIO_meth_set_create(readBioMethod, x_bio_create)) {
-		return 10;
-	}
-	if (1 != BIO_meth_set_destroy(readBioMethod, x_bio_free)) {
-		return 11;
-	}
-
-	return 0;
-}
 
 const EVP_MD *X_EVP_dss() {
 	return NULL;
@@ -389,11 +344,6 @@ int X_shim_init() {
 	CRYPTO_set_locking_callback(go_thread_locking_callback);
 	CRYPTO_set_id_callback(go_thread_id_callback);
 
-	rc = x_bio_init_methods();
-	if (rc != 0) {
-		return rc;
-	}
-
 	return 0;
 }
 
@@ -429,14 +379,6 @@ int X_SSL_session_reused(SSL *ssl) {
 
 int X_SSL_new_index() {
 	return SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
-}
-
-int X_SSL_verify_cb(int ok, X509_STORE_CTX* store) {
-	SSL* ssl = (SSL *)X509_STORE_CTX_get_ex_data(store,
-			SSL_get_ex_data_X509_STORE_CTX_idx());
-	void* p = SSL_get_ex_data(ssl, get_ssl_idx());
-	// get the pointer to the go Ctx object and pass it back into the thunk
-	return go_ssl_verify_cb_thunk(p, ok, store);
 }
 
 const SSL_METHOD *X_SSLv23_method() {
@@ -528,15 +470,6 @@ long X_SSL_CTX_set_tlsext_servername_callback(
 	return SSL_CTX_set_tlsext_servername_callback(ctx, cb);
 }
 
-int X_SSL_CTX_verify_cb(int ok, X509_STORE_CTX* store) {
-	SSL* ssl = (SSL *)X509_STORE_CTX_get_ex_data(store,
-			SSL_get_ex_data_X509_STORE_CTX_idx());
-	SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
-	void* p = SSL_CTX_get_ex_data(ssl_ctx, get_ssl_ctx_idx());
-	// get the pointer to the go Ctx object and pass it back into the thunk
-	return go_ssl_ctx_verify_cb_thunk(p, ok, store);
-}
-
 long X_SSL_CTX_set_tmp_dh(SSL_CTX* ctx, DH *dh) {
     return SSL_CTX_set_tmp_dh(ctx, dh);
 }
@@ -550,16 +483,6 @@ int X_SSL_CTX_set_tlsext_ticket_key_cb(SSL_CTX *sslctx,
                   unsigned char iv[EVP_MAX_IV_LENGTH],
                   EVP_CIPHER_CTX *ctx, HMAC_CTX *hctx, int enc)) {
     return SSL_CTX_set_tlsext_ticket_key_cb(sslctx, cb);
-}
-
-int X_SSL_CTX_ticket_key_cb(SSL *s, unsigned char key_name[16],
-		unsigned char iv[EVP_MAX_IV_LENGTH],
-		EVP_CIPHER_CTX *cctx, HMAC_CTX *hctx, int enc) {
-
-	SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(s);
-	void* p = SSL_CTX_get_ex_data(ssl_ctx, get_ssl_ctx_idx());
-	// get the pointer to the go Ctx object and pass it back into the thunk
-	return go_ticket_key_cb_thunk(p, s, key_name, iv, cctx, hctx, enc);
 }
 
 int X_BIO_get_flags(BIO *b) {
