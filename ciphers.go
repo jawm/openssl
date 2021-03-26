@@ -18,11 +18,131 @@ package openssl
 import "C"
 
 import (
+	"crypto/cipher"
 	"errors"
 	"fmt"
 	"runtime"
 	"unsafe"
 )
+
+type UnauthenticatedGCM struct {
+	ctx *cipherCtx
+	enc bool
+}
+
+func NewUnauthenticatedGCM(isEncrypter bool, key []byte, iv []byte) (cipher.BlockMode, error) {
+	ctx, err := newCipherCtx()
+	if err != nil {
+		return nil, err
+	}
+
+	keyptr := (*C.uchar)(&key[0])
+	ivptr := (*C.uchar)(&iv[0])
+
+	ccipher := C.EVP_aes_256_gcm()
+	cipher := &Cipher{ptr: ccipher}
+
+	/* Initialise the encryption operation. */
+	if 1 != C.EVP_DecryptInit_ex(ctx.ctx, cipher.ptr, nil, keyptr, ivptr) {
+		return nil, errors.New("Error decrypt init")
+	}
+
+	return UnauthenticatedGCM{ctx: ctx, enc: isEncrypter}, nil
+}
+
+func (ugcm UnauthenticatedGCM) BlockSize() int {
+	return 16
+}
+
+func (ugcm UnauthenticatedGCM) CryptBlocks(dst, src []byte) {
+	srcPtr := (*C.uchar)(&src[0])
+	srcLen := C.int(len(src))
+
+	dstPtr := (*C.uchar)(&dst[0])
+	dstLen := C.int(0)
+	if ugcm.enc {
+		if 1 != C.EVP_EncryptUpdate(ugcm.ctx.ctx, dstPtr, &dstLen, srcPtr, srcLen) {
+			panic(errors.New("Error encrypt update"))
+		}
+	} else {
+		if 1 != C.EVP_DecryptUpdate(ugcm.ctx.ctx, dstPtr, &dstLen, srcPtr, srcLen) {
+			panic(errors.New("Error decrypt update"))
+		}
+	}
+	if dstLen > srcLen {
+		panic("Unexpected length difference, possible buffer overrun") // I don't think this is possible with GCM
+	}
+}
+
+// // DecryptWithoutAuthenticationGCM will decrypt a message using GCM. It will NOT authenticate the message.
+// // This is a terrible idea. Don't do this. Unless you have to, like me :(
+// func DecryptWithoutAuthenticationGCM(cipherText []byte, key []byte, iv []byte) ([]byte, error) {
+
+// 	// txtPtr := (*C.uchar)(&cipherText[0])
+// 	// txtLen := C.int(len(cipherText))
+
+// 	// result := make([]byte, txtLen+16)
+// 	// resPtr := (*C.uchar)(&result[0])
+// 	// resLen := C.int(0)
+// 	// if 1 != C.EVP_DecryptUpdate(ctx.ctx, resPtr, &resLen, txtPtr, txtLen) {
+// 	// 	return nil, errors.New("Error decrypt update")
+// 	// }
+
+// 	// return result[:resLen], nil
+
+// 	// ---------------- YESTERDAY
+
+// 	// cipher, err := GetCipherByName("aes-256-gcm")
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
+
+// 	// ctx, err := newCipherCtx()
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
+
+// 	// if 1 != C.EVP_DecryptInit_ex(ctx.ctx, cipher.ptr, nil, nil, nil) {
+// 	// 	return nil, errors.New("failed to initialize cipher context")
+// 	// }
+
+// 	// if 1 != C.EVP_CIPHER_CTX_ctrl(ctx.ctx, C.EVP_CTRL_GCM_SET_IVLEN, C.int(16), nil) {
+// 	// 	return nil, errors.New("failed to set IV length to 16")
+// 	// }
+
+// 	// if 1 != C.EVP_DecryptInit_ex(ctx.ctx, nil, nil, (*C.uchar)(&key[0]), (*C.uchar)(&iv[0])) {
+// 	// 	return nil, errors.New("failed to set key and iv for cipher context")
+// 	// }
+
+// 	// C.EVP_CIPHER_CTX_set_padding(ctx.ctx, 0)
+
+// 	// fmt.Println("BLOCKSIZE?!", cipher.BlockSize(), ctx.BlockSize())
+
+// 	// if len(cipherText) == 0 {
+// 	// 	return nil, nil
+// 	// }
+// 	// outbuf := make([]byte, len(cipherText)+16) // 16 is the block size
+// 	// outlen := C.int(len(outbuf))
+// 	// res := C.EVP_DecryptUpdate(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen,
+// 	// 	(*C.uchar)(&cipherText[0]), C.int(len(cipherText)))
+// 	// if res != 1 {
+// 	// 	return nil, fmt.Errorf("failed to decrypt [result %d]", res)
+// 	// }
+// 	// upd := outbuf[:outlen]
+
+// 	// outbuf2 := make([]byte, 16)
+// 	// var outlen2 C.int
+// 	// res = C.EVP_DecryptFinal_ex(ctx.ctx, (*C.uchar)(&outbuf2[0]), &outlen2)
+// 	// if res != 1 {
+// 	// 	// this may mean the tag failed to verify- all previous plaintext
+// 	// 	// returned must be considered faked and invalid
+// 	// 	fmt.Println("wher the fuck we at", res)
+// 	// 	return nil, errors.New("decryption failed")
+// 	// }
+
+// 	// upd = append(upd, outbuf2[:outlen2]...)
+// 	// return upd, nil
+// }
 
 const (
 	GCM_TAG_MAXLEN = 16
@@ -304,6 +424,7 @@ func (ctx *decryptionCipherCtx) DecryptUpdate(input []byte) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, nil
 	}
+
 	outbuf := make([]byte, len(input)+ctx.BlockSize())
 	outlen := C.int(len(outbuf))
 	res := C.EVP_DecryptUpdate(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen,
