@@ -1,6 +1,16 @@
-# OpenSSL bindings for Go
+# Unauthenticated GCM in Go
 
-Please see http://godoc.org/github.com/spacemonkeygo/openssl for more info
+The Go stdlib implementation of GCM is quite restrictive in that it makes it difficult to do things incorrectly.
+Sometimes you don't have a choice though. This library allows you to do streaming GCM encryption without authenticating data.
+You should not do this unless you absolutely must.
+
+This was forked from here: github.com/spacemonkeygo/openssl
+The original code was more general purpose, but I've gutted most things I don't need. 
+
+## Building
+
+If you want to build this, you must provide the build tag "gcm". If you don't provide it a no-op implementation will be compiled instead.
+This is useful for if you want to just switch off the encryption entirely during development (since it's slightly a pain to setup OpenSSL on your dev machine).
 
 ### License
 
@@ -17,14 +27,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-### Using on macOS
-1. Install [homebrew](http://brew.sh/)
-2. `$ brew install openssl` or `$ brew install openssl@1.1`
-
-### Using on Windows
-1. Install [mingw-w64](http://mingw-w64.sourceforge.net/)
-2. Install [pkg-config-lite](http://sourceforge.net/projects/pkgconfiglite)
-3. Build (or install precompiled) openssl for mingw32-w64
-4. Set __PKG\_CONFIG\_PATH__ to the directory containing openssl.pc
-   (i.e. c:\mingw64\mingw64\lib\pkgconfig)
